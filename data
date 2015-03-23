@@ -1,0 +1,63 @@
+{
+"xid": 690,
+"change": [
+{
+"kind": "insert",
+"schema": "public",
+"table": "data",
+"columnnames": ["id", "data"],
+"columntypes": ["int4", "text"],
+"columnvalues": [12, "some"]
+}
+,{
+"kind": "insert",
+"schema": "public",
+"table": "data",
+"columnnames": ["id", "data"],
+"columntypes": ["int4", "text"],
+"columnvalues": [13, "new"]
+}
+,{
+"kind": "insert",
+"schema": "public",
+"table": "data",
+"columnnames": ["id", "data"],
+"columntypes": ["int4", "text"],
+"columnvalues": [14, "data"]
+}
+,{
+"kind": "delete",
+"schema": "public",
+"table": "data",
+"oldkeys": {
+"keynames": ["id"],
+"keytypes": ["int4"],
+"keyvalues": [1]
+}
+}
+,{
+"kind": "delete",
+"schema": "public",
+"table": "data",
+"oldkeys": {
+"keynames": ["id"],
+"keytypes": ["int4"],
+"keyvalues": [2]
+}
+}
+,{
+"kind": "update",
+"schema": "public",
+"table": "data",
+"columnnames": ["id", "data"],
+"columntypes": ["int4", "text"],
+"columnvalues": [5, "foobar"],
+"oldkeys": {
+"keynames": ["id"],
+"keytypes": ["int4"],
+"keyvalues": [5]
+}
+}
+]
+}
+
