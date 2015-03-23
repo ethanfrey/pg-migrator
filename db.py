@@ -21,7 +21,8 @@ def update_to_sql(item, cur):
     set_placeholder = _make_pair_placeholder(item['columnnames'])
     sql = "UPDATE {} SET {} WHERE {};".format(item['table'], set_placeholder, query_placeholder)
     sql_values = item['columnvalues'] + item['oldkeys']['keyvalues']
-    return cur.mogrify(sql, sql_values)
+    print cur.mogrify(sql, sql_values)
+    return cur.execute(sql, sql_values)
 
 
 def insert_to_sql(item, cur):
@@ -29,11 +30,13 @@ def insert_to_sql(item, cur):
     value_placeholder = ', '.join(['%s'] * len(item['columnvalues']))
     sql = "INSERT INTO {} ({}) VALUES ({});".format(item['table'], columns, value_placeholder)
     sql_values = item['columnvalues']
-    return cur.mogrify(sql, sql_values)
+    print cur.mogrify(sql, sql_values)
+    return cur.execute(sql, sql_values)
 
 
 def delete_to_sql(item, cur):
     query_placeholder = _make_pair_placeholder(item['oldkeys']['keynames'])
     sql = "DELETE FROM {} WHERE {};".format(item['table'], query_placeholder)  
     sql_values = item['oldkeys']['keyvalues']
-    return cur.mogrify(sql, sql_values)
+    print cur.mogrify(sql, sql_values)
+    return cur.execute(sql, sql_values)

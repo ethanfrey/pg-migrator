@@ -1,0 +1,17 @@
+createdb src_test
+createdb dest_test
+
+psql src_test -c "create table data (id serial primary key, info text);"
+psql dest_test -c "create table data (id serial primary key, info text, new_info text);"
+
+python json_receiver.py --source src_test --dest dest_test --slot foobar
+
+psql src_test
+
+INSERT INTO data (info) values ('one', 'more', 'time');
+INSERT INTO data (info) values ('blue');
+UPDATE data set info = 'red' where info = 'time';
+DELETE FROM data where info = 'one';
+SELECT * FROM data;
+
+UPDATE data set info = 'red' where id = 7;
