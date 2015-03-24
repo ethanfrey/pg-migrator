@@ -8,12 +8,13 @@ except ImportError:
     import ijson
 
 from db import json_to_sql
-from migrate import transform, register_transform
+from migrate import Transformer, value_for_key
 
 
 def add_new_data(item):
     item['columnnames'].append('new_info')
-    item['columnvalues'].append('NEW: {}'.format(item['columnvalues'][1]))
+    new_data = 'NEW: {}'.format(value_for_key(item, 'info'))
+    item['columnvalues'].append(new_data)
 
 
 def setup_replication_slot(source_db, slot):
@@ -29,7 +30,8 @@ def cleanup_replication_slot(source_db, slot):
 
 def main(source_db, dest_db, slot):
     # TODO: load migrations from external file???
-    register_transform('data', add_new_data)
+    transformer = Transformer()
+    transformer.register('data', add_new_data)
     try:
         proc = setup_replication_slot(source_db, slot)
         # parsed = ijson.parse(proc.stdout, multiple_values=True, buf_size=256)
@@ -41,7 +43,7 @@ def main(source_db, dest_db, slot):
             cur = conn.cursor()
             # with conn.cursor() as cur:
             for item in change_list:
-                transformed = transform(item)
+                transformed = transformer.transform(item)
                 json_to_sql(transformed, cur)
             print "Commiting"
             conn.commit()
