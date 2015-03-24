@@ -7,7 +7,7 @@ try:
 except ImportError:
     import ijson
 
-from db import json_to_sql
+from db import JsonWriter
 from migrate import Transformer, value_for_key
 
 
@@ -15,6 +15,7 @@ def add_new_data(item):
     item['columnnames'].append('new_info')
     new_data = 'NEW: {}'.format(value_for_key(item, 'info'))
     item['columnvalues'].append(new_data)
+    return item
 
 
 def setup_replication_slot(source_db, slot):
@@ -34,20 +35,23 @@ def main(source_db, dest_db, slot):
     transformer.register('data', add_new_data)
     try:
         proc = setup_replication_slot(source_db, slot)
-        # parsed = ijson.parse(proc.stdout, multiple_values=True, buf_size=256)
-        parsed = ijson.parse(proc.stdout, multiple_values=True, buf_size=1)
 
-        conn = psycopg2.connect(database=dest_db)
+        # parsed = ijson.parse(proc.stdout, multiple_values=True, buf_size=64)
+        parsed = ijson.parse(proc.stdout, multiple_values=True, buf_size=1)
+        writer = JsonWriter(dest_db)
+
         for change_list in ijson.common.items(parsed, 'change'):
-            print "New cursor"
-            cur = conn.cursor()
-            # with conn.cursor() as cur:
+            writer.begin()
             for item in change_list:
                 transformed = transformer.transform(item)
-                json_to_sql(transformed, cur)
-            print "Commiting"
-            conn.commit()
+                if isinstance(transformed, (list, tuple)):
+                    for action in transformed:
+                        writer.write_json(action)
+                else:
+                    writer.write_json(transformed)
+            writer.commit()
     finally:
+        writer.close()
         proc.kill()
         cleanup_replication_slot(source_db, slot)
 
