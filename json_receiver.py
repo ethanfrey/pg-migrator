@@ -1,7 +1,4 @@
 import argparse
-import subprocess
-
-import psycopg2
 try:
     import ijson.backends.yajl2 as ijson
 except ImportError:
@@ -9,6 +6,7 @@ except ImportError:
 
 from db import JsonWriter
 from migrate import Transformer, value_for_key
+from receiver import SubprocessReceiver
 
 
 def add_new_data(item):
@@ -18,26 +16,18 @@ def add_new_data(item):
     return item
 
 
-def setup_replication_slot(source_db, slot):
-    cmd = ['pg_recvlogical', '-d', source_db, '--slot', slot, '--plugin', 'wal2json', '--create-slot', '--start', '-f', '-'] + \
-        ['-o', 'include-schemas=f', '-o', 'include-types=f', '-o', 'include-timestamp=f']
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=1)
-    return proc
-
-
-def cleanup_replication_slot(source_db, slot):
-    subprocess.call(['pg_recvlogical', '-d', source_db, '--slot', slot, '--drop-slot'])
-
-
 def main(source_db, dest_db, slot):
     # TODO: load migrations from external file???
     transformer = Transformer()
     transformer.register('data', add_new_data)
+    receiver = SubprocessReceiver(source_db, slot)
+
     try:
-        proc = setup_replication_slot(source_db, slot)
+        receiver.create_replication_slot()
+        data_stream = receiver.start_replication()
 
         # parsed = ijson.parse(proc.stdout, multiple_values=True, buf_size=64)
-        parsed = ijson.parse(proc.stdout, multiple_values=True, buf_size=1)
+        parsed = ijson.parse(data_stream, multiple_values=True, buf_size=1)
         writer = JsonWriter(dest_db)
 
         for change_list in ijson.common.items(parsed, 'change'):
@@ -52,8 +42,8 @@ def main(source_db, dest_db, slot):
             writer.commit()
     finally:
         writer.close()
-        proc.kill()
-        cleanup_replication_slot(source_db, slot)
+        receiver.stop_replication()
+        receiver.drop_replication_slot()
 
 
 if __name__ == '__main__':
