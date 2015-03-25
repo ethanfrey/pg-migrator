@@ -16,7 +16,12 @@ SELECT * FROM pg_last_xlog_replay_location();
 
 # promotion, now we have two masters and replication is paused
 
+# when are on the docker machine...
 docker exec pg_slave gosu postgres pg_ctl promote -D /var/lib/postgresql/data
+
+# through psql if you know the trigger file name...
+COPY (SELECT 1) TO '/var/lib/postgresql/data/DUMPED_FROM_PSQL.txt';
+
 
 
 # migration

@@ -1,3 +1,4 @@
+import psycopg2
 import subprocess
 
 
@@ -65,4 +66,68 @@ class SubprocessReceiver(Receiver):
             self.proc.kill()
 
 
-# TODO: psycopg receiver
+class PsycopgReceiver(Receiver):
+    def __init__(self, *args, **kwargs):
+        super(PsycopgReceiver, self).__init__(*args, **kwargs)
+        self.conn = None
+        self.cur = None
+
+    def _ensure_connection(self):
+        if not self.conn or self.conn.closed:
+            self.conn = psycopg2.connect(**self.conn_args)
+
+    def _ensure_cursor(self):
+        self._ensure_connection()
+        if not self.cur or self.cur.closed:
+            self.cur = self.conn.cursor()
+
+    def create_replication_slot(self):
+        self._ensure_cursor()
+        sql = "SELECT * FROM pg_create_logical_replication_slot(%s, %s);"
+        sql_values = (self.slot, self.plugin)
+        self.cur.execute(sql, sql_values)
+
+    def drop_replication_slot(self):
+        self._ensure_cursor()
+        sql = "SELECT * FROM pg_drop_replication_slot(%s);"
+        sql_values = (self.slot,)
+        self.cur.execute(sql, sql_values)
+
+    def get_slot_location(self):
+        self._ensure_cursor()
+        sql = "SELECT restart_lsn FROM pg_replication_slots WHERE slot_name = %s;"
+        sql_values = (self.slot,)
+        self.cur.execute(sql, sql_values)
+        result = self.cur.fetchone()[0]
+        return result
+
+    def consume_slot_changes(self, to_lsn):
+        sql = "SELECT * FROM pg_logical_slot_get_changes(%s, %s, NULL);"
+        sql_values = (self.slot, to_lsn)
+        self.cur.execute(sql, sql_values)
+
+    def check_physical_xlog_replay(self):
+        """This is to run on the slave..."""
+        sql_xlog = "SELECT * FROM pg_last_xlog_replay_location();"
+        self.cur.execute(sql_xlog)
+        xlog = self.cur.fetchone()[0]
+        return xlog
+
+    def is_slave(self):
+        self._ensure_cursor()
+        sql_check = "SELECT * FROM pg_is_in_recovery();"
+        self.cur.execute(sql_check)
+        return self.cur.fetchone()[0]
+
+    def promote_slave(self, trigger_file):
+        if not self.is_slave():
+            raise Exception("Target is already promoted, cannot promote")
+        sql = "COPY (SELECT 1) TO %s;"
+        sql_values = (trigger_file, )
+        self.cur.execute(sql, sql_values)
+
+    def start_replication(self):
+        raise NotImplementedError()
+
+    def stop_replication(self):
+        raise NotImplementedError()

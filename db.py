@@ -41,7 +41,6 @@ class JsonWriter(object):
             self.conn.close()
 
     def write_json(self, item):
-        # self.begin()
         if item['kind'] == 'insert':
             self.insert_to_sql(item)
         elif item['kind'] == 'update':
@@ -77,3 +76,4 @@ class JsonWriter(object):
         sql_values = item['oldkeys']['keyvalues']
         print self.cur.mogrify(sql, sql_values)
         self.cur.execute(sql, sql_values)
+

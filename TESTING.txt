@@ -1,0 +1,62 @@
+1. First start up master and slave (eg. as docker images)
+  - make sure the replication runs and both have the same data more or less
+  - you must know ports, hostname, password, etc.
+  - make sure you also know the trigger_file for promoting the slave
+
+2. Set up tables and run simulated inserts on master
+master-psql ->
+
+CREATE TABLE data(id serial primary key, data text);
+
+## start script
+
+* 1000:
+INSERT INTO data VALUES ('a');
+SELECT pg_sleep(0.5);
+
+## Make sure data is also on slave
+
+slave-psql ->
+
+SELECT * FROM data;
+
+3. Convert syncing from physical to logical (upgrade slave->master2)
+
+cd /vagrant/migrator
+. /usr/local/bin/virtualenvwrapper.sh
+workon pg_migrator
+HOSTNAME=$(netstat -rn | grep "^0.0.0.0 " | cut -d " " -f10)
+
+python physical_logical_syncer.py --src_db=postgres --src_user=postgres --src_password=password --src_port=15432 --src_host=$HOSTNAME \
+    --dest_db=postgres --dest_user=postgres --dest_password=password --dest_port=15433 --dest_host=$HOSTNAME \
+    --trigger=/var/lib/postgresql/data/promote.trigger --slot=sync_test_1
+
+4. Run migration on master2
+
+psql->
+
+ALTER TABLE data ADD COLUMN new_info text;
+UPDATE data SET new_info = 'NEW: ' || info;
+
+5. Connect original master and master2 with transforming replication pipeline
+
+python json_receiver.py --src_db=postgres --src_user=postgres --src_password=password --src_port=15432 --src_host=$HOSTNAME \
+    --dest_db=postgres --dest_user=postgres --dest_password=password --dest_port=15433 --dest_host=$HOSTNAME \
+    --slot=sync_test_1
+
+
+6. Stop simulated inserts
+  - TODO: kill script from part 2
+
+7. Verify the same data on master1 and master2 (just different format)
+
+# on both...
+SELECT COUNT(*) FROM data;
+SELECT max(id) FROM data;
+
+# on slave...
+SELECT COUNT(*) FROM data WHERE new_info IS NULL;
+
+8. Celebrate!
+
+
