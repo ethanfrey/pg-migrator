@@ -16,19 +16,21 @@ def add_new_data(item):
     return item
 
 
-def main(source_db, dest_db, slot):
+def main(source, dest, slot, auto_slot=False):
     # TODO: load migrations from external file???
     transformer = Transformer()
     transformer.register('data', add_new_data)
-    receiver = SubprocessReceiver(source_db, slot)
+    receiver = SubprocessReceiver(slot=slot, **source)
 
+    writer = None
     try:
-        receiver.create_replication_slot()
+        if auto_slot:
+            receiver.create_replication_slot()
         data_stream = receiver.start_replication()
 
         # parsed = ijson.parse(proc.stdout, multiple_values=True, buf_size=64)
         parsed = ijson.parse(data_stream, multiple_values=True, buf_size=1)
-        writer = JsonWriter(dest_db)
+        writer = JsonWriter(**dest)
 
         for change_list in ijson.common.items(parsed, 'change'):
             writer.begin()
@@ -41,20 +43,42 @@ def main(source_db, dest_db, slot):
                     writer.write_json(transformed)
             writer.commit()
     finally:
-        writer.close()
-        receiver.stop_replication()
-        receiver.drop_replication_slot()
+        if writer:
+            writer.close()
+        if receiver:
+            receiver.stop_replication()
+            if auto_slot:
+                receiver.drop_replication_slot()
 
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Logical replication with optional migrations.')
-    parser.add_argument('--source',
+    parser.add_argument('--src_db',
                         help='databse name to replicate from')
-    parser.add_argument('--dest',
+    parser.add_argument('--dest_db',
                         help='databse name to replicate to')
+    parser.add_argument('--src_port',
+                        help='databse name to replicate from')
+    parser.add_argument('--dest_port',
+                        help='databse name to replicate to')
+    parser.add_argument('--src_host',
+                        help='databse host to replicate from')
+    parser.add_argument('--dest_host',
+                        help='databse host to replicate to')
+    parser.add_argument('--src_user',
+                        help='databse user to authenticate')
+    parser.add_argument('--dest_user',
+                        help='databse user to authenticate')
+    parser.add_argument('--src_password',
+                        help='databse password to authenticate')
+    parser.add_argument('--dest_password',
+                        help='databse password to authenticate')
     parser.add_argument('--slot',
                         help='replication slot name')
 
     args = parser.parse_args()
-    main(source_db=args.source, dest_db=args.dest, slot=args.slot)
+    main(source=dict(database=args.src_db, port=args.src_port, host=args.src_host, user=args.src_user, password=args.src_password), 
+         dest=dict(database=args.dest_db, port=args.dest_port, host=args.dest_host, user=args.dest_user, password=args.dest_password), 
+         slot=args.slot)
+

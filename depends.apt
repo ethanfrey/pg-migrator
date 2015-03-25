@@ -1,1 +1,2 @@
 sudo apt-get install libyajl2
+sudo apt-get install postgresql-9.4

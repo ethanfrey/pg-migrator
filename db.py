@@ -2,14 +2,14 @@ import psycopg2
 
 
 class JsonWriter(object):
-    def __init__(self, db_name):
-        self.db_name = db_name
+    def __init__(self, **conn_args):
+        self.conn_args = conn_args
         self.conn = None
         self.cur = None
 
     def _ensure_connection(self):
         if not self.conn or self.conn.closed:
-            self.conn = psycopg2.connect(database=self.db_name)
+            self.conn = psycopg2.connect(**self.conn_args)
 
     def _ensure_cursor(self):
         self._ensure_connection()

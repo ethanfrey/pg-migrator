@@ -1,0 +1,44 @@
+# master
+SELECT * FROM pg_create_logical_replication_slot('migration_slot', 'wal2json');
+SELECT restart_lsn FROM pg_replication_slots WHERE slot_name = 'migration_slot';
+-> 0/3000138
+
+SELECT * FROM pg_current_xlog_location();
+
+
+
+# slave
+
+SELECT * FROM pg_is_in_recovery();
+SELECT * FROM pg_last_xlog_replay_location();
+-> 0/30006C8
+
+
+# promotion, now we have two masters and replication is paused
+
+docker exec pg_slave gosu postgres pg_ctl promote -D /var/lib/postgresql/data
+
+
+# migration
+
+ALTER TABLE data ADD COLUMN new_info text;
+UPDATE data SET new_info = 'NEW: ' || info;
+
+
+# now start replication from the proper location....
+
+# empty the buffer to the point we want
+SELECT * FROM pg_logical_slot_get_changes('migration_slot', '0/30006C8', NULL);
+# read the rest...
+SELECT * FROM pg_logical_slot_peek_changes('migration_slot', NULL, NULL);
+
+# run the migrator!!!
+# must be on a system with postgres9.4
+
+
+
+# for vagrant talking to the host system...
+HOSTNAME=$(netstat -rn | grep "^0.0.0.0 " | cut -d " " -f10)
+
+python json_receiver.py --src_db=postgres --src_user=postgres --src_password=password --src_port=15432 --src_host=$HOSTNAME --dest_db=postgres --dest_user=postgres --dest_password=password --dest_port=15433 --dest_host=$HOSTNAME --slot=migration_slot
+
