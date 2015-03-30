@@ -11,7 +11,7 @@ class Receiver(object):
         # TODO: allow configuration???
         self.plugin = 'wal2json'
         self.options = {
-            'include-schemas': False,
+            'include-schemas': True,
             'include-types': False,
             'include-timestamp': False,
             'include-xids': True
@@ -39,7 +39,7 @@ class SubprocessReceiver(Receiver):
 
     def _make_plugin_options(self):
         # TODO: build from self.options
-        return ['-o', 'include-schemas=f', '-o', 'include-types=f', '-o', 'include-timestamp=f']
+        return ['-o', 'include-schemas=t', '-o', 'include-types=f', '-o', 'include-timestamp=f']
 
     def create_replication_slot(self):
         cmd = ['pg_recvlogical', '--slot', self.slot, '--plugin', self.plugin, '--create-slot'] + self._make_conn_args()

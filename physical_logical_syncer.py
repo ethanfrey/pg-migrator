@@ -87,3 +87,6 @@ if __name__ == '__main__':
     source = dict(database=args.src_db, port=args.src_port, host=args.src_host, user=args.src_user, password=args.src_password)
     dest = dict(database=args.dest_db, port=args.dest_port, host=args.dest_host, user=args.dest_user, password=args.dest_password)
     main(source=source, dest=dest, slot=args.slot, trigger=args.trigger)
+
+
+# TODO: insert DDL event trigger, write to special table, handle special json logical syncing....

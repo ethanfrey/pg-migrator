@@ -1,4 +1,8 @@
+from collections import defaultdict
+
 import psycopg2
+
+from migrate import value_for_key
 
 
 class JsonWriter(object):
@@ -6,6 +10,7 @@ class JsonWriter(object):
         self.conn_args = conn_args
         self.conn = None
         self.cur = None
+        self._init_sequence_mapper()
 
     def _ensure_connection(self):
         if not self.conn or self.conn.closed:
@@ -69,6 +74,8 @@ class JsonWriter(object):
         sql_values = item['columnvalues']
         print self.cur.mogrify(sql, sql_values)
         self.cur.execute(sql, sql_values)
+        # TODO: table -> pk_name, sequence mapper, then update sequence on insert
+        self.increment_sequences_for_item(item)
 
     def delete_to_sql(self, item):
         query_placeholder = self._make_pair_placeholder(item['oldkeys']['keynames'])
@@ -76,4 +83,56 @@ class JsonWriter(object):
         sql_values = item['oldkeys']['keyvalues']
         print self.cur.mogrify(sql, sql_values)
         self.cur.execute(sql, sql_values)
+
+    def _init_sequence_mapper(self):
+        self.sequence_map = defaultdict(lambda: [])
+        self._ensure_cursor()
+        get_all_seq_sql = """SELECT d.nspname,
+           b.oid,
+           c.oid,
+           b.relname as table_name,
+           c.relname as seq_name,
+           e.attname
+        FROM   pg_depend AS a,
+           pg_class AS b,
+           pg_class AS c,
+           pg_namespace AS d,
+           pg_attribute AS e
+        WHERE  ( refobjid IN (SELECT oid
+                              FROM   pg_class
+                              WHERE  relkind = 'r')
+                  OR refobjsubid IN (SELECT oid
+                                 FROM   pg_class
+                                 WHERE  relkind = 'r') )
+           AND b.relkind = 'r'
+           AND b.oid = a.refobjid
+           AND c.relkind = 'S'
+           AND c.oid = a.objid
+           AND d.oid = b.relnamespace
+           AND e.attrelid = b.oid
+           AND e.attnum = a.refobjsubid;"""
+        self.cur.execute(get_all_seq_sql)
+        for (schema, _oid1, _oid2, table_name, seq_name, attr_name) in self.cur.fetchall():
+            key = "{}.{}".format(schema, table_name)
+            self.sequence_map[key].append((attr_name, seq_name))
+        # debug
+        print self.sequence_map
+
+    def increment_sequences_for_item(self, item):
+        """
+        when we replication insertions through logical replication, sequences aren't automatically incremented...
+        this code fixes that!
+        """
+        key = "{}.{}".format(item['schema'], item['table'])
+        for attr, seq in self.sequence_map[key]:
+            val = value_for_key(item, attr)
+            print "updating seq {} to {}".format(seq, val)
+            # this may increment too much, but never go down
+            update_sql = "select case when nextval(%s) < %s THEN setval(%s, %s) end;"
+            sql_vals = (seq, val, seq, val)
+            # this doesn't do extra increments, but may decend...
+            # update_sql = "select setval(%s, %s);"
+            # sql_vals = (seq, val)
+            print self.cur.mogrify(update_sql, sql_vals)
+            self.cur.execute(update_sql, sql_vals)
 

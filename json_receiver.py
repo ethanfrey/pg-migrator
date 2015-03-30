@@ -16,6 +16,21 @@ def add_new_data(item):
     return item
 
 
+def filter_out_all_foos(item):
+    # TODO: patch wal2json to add this functionality
+    if value_for_key(item, 'info').lower().startswith('foo'):
+        return []
+    else:
+        return item
+
+
+def delete_info_column(item):
+    index = item['columnnames'].index('info')
+    item['columnnames'].pop(index)
+    item['columnvalues'].pop(index)
+    return item
+
+
 def main(source, dest, slot, auto_slot=False):
     # TODO: load migrations from external file???
     transformer = Transformer()
@@ -36,6 +51,7 @@ def main(source, dest, slot, auto_slot=False):
             writer.begin()
             for item in change_list:
                 transformed = transformer.transform(item)
+                # TODO: support None
                 if isinstance(transformed, (list, tuple)):
                     for action in transformed:
                         writer.write_json(action)
