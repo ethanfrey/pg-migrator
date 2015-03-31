@@ -136,3 +136,25 @@ class JsonWriter(object):
             print self.cur.mogrify(update_sql, sql_vals)
             self.cur.execute(update_sql, sql_vals)
 
+    def get_last_lsn(self, slot):
+        create_sql = "CREATE TABLE IF NOT EXISTS lsn_sync_log(slot text, lsn pg_lsn);"
+        self.cur.execute(create_sql)
+        query_sql = "SELECT lsn FROM lsn_sync_log WHERE slot = %s;"
+        self.cur.execute(query_sql, (slot,))
+        lsn = self.cur.fetchone()
+        if lsn:
+            return lsn[0]
+        else:
+            insert_sql = "INSERT INTO lsn_sync_log (slot, lsn) VALUES (%s, %s);"
+            self.cur.execute(insert_sql, (slot, "0/0"))
+            return None
+
+    def set_end_lsn(self, slot, end_lsn):
+        # we have to add 0x40 to this to move beyond the "end commit" wal block
+        lsn1, lsn2 = end_lsn.split('/')
+        lsn2 = hex(int(lsn2, 16) + 64).upper()[2:]
+        start_lsn = '{}/{}'.format(lsn1, lsn2)
+        insert_sql = "UPDATE lsn_sync_log SET lsn = %s WHERE slot = %s and lsn < %s;"
+        self.cur.execute(insert_sql, (start_lsn, slot, start_lsn))
+
+

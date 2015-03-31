@@ -51,11 +51,13 @@ class SubprocessReceiver(Receiver):
         cmd = ['pg_recvlogical', '--slot', self.slot, '--drop-slot'] + self._make_conn_args()
         subprocess.call(cmd, env=self._make_environment())
 
-    def start_replication(self):
+    def start_replication(self, start_lsn=None):
         if self.proc:
             raise Exception('Process {} already running'.format(self.proc.pid))
         cmd = ['pg_recvlogical', '--slot', self.slot, '--start', '-f', '-'] + \
             self._make_conn_args() + self._make_plugin_options()
+        if start_lsn:
+            cmd += ['--startpos', start_lsn]
         print ' '.join(cmd)
         print self._make_environment()
         self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=1, env=self._make_environment())

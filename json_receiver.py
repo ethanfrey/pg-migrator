@@ -36,18 +36,24 @@ def main(source, dest, slot, auto_slot=False):
     transformer = Transformer()
     transformer.register('data', add_new_data)
     receiver = SubprocessReceiver(slot=slot, **source)
+    writer = JsonWriter(**dest)
 
-    writer = None
     try:
         if auto_slot:
             receiver.create_replication_slot()
-        data_stream = receiver.start_replication()
+
+        start_lsn = writer.get_last_lsn(slot)
+        data_stream = receiver.start_replication(start_lsn)
 
         # parsed = ijson.parse(proc.stdout, multiple_values=True, buf_size=64)
         parsed = ijson.parse(data_stream, multiple_values=True, buf_size=1)
-        writer = JsonWriter(**dest)
 
-        for change_list in ijson.common.items(parsed, 'change'):
+        for txn in ijson.common.items(parsed, ''):
+            end_lsn = txn.get('end_lsn')
+            print "Xid: {}".format(txn.get('xid'))
+            print "Start Lsn: {}".format(txn.get('start_lsn'))
+            print "End Lsn: {}".format(end_lsn)
+            change_list = txn['change']
             writer.begin()
             for item in change_list:
                 transformed = transformer.transform(item)
@@ -57,6 +63,8 @@ def main(source, dest, slot, auto_slot=False):
                         writer.write_json(action)
                 else:
                     writer.write_json(transformed)
+            # record last lsn in lsn_sync_log... TODO: add 0/40?
+            writer.set_end_lsn(slot, end_lsn)
             writer.commit()
     finally:
         if writer:
