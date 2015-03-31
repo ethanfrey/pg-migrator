@@ -6,7 +6,6 @@ from receiver import PsycopgReceiver
 
 
 def main(source, dest, slot, trigger):
-    # TODO: load migrations from external file???
     master = PsycopgReceiver(slot=slot, **source)
     slave = PsycopgReceiver(slot=slot, **dest)
 
@@ -25,7 +24,6 @@ def main(source, dest, slot, trigger):
 
     print "Slave is in a good state: {}".format(slave_state)
     print "Promoting with trigger file: {}...".format(trigger)
-    # docker exec pg_slave gosu postgres pg_ctl promote -D /var/lib/postgresql/data
     slave.promote_slave(trigger)
 
     timeout = 30

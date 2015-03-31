@@ -45,7 +45,9 @@ def main(source, dest, slot, auto_slot=False):
         start_lsn = writer.get_last_lsn(slot)
         data_stream = receiver.start_replication(start_lsn)
 
-        # parsed = ijson.parse(proc.stdout, multiple_values=True, buf_size=64)
+        # You can increase buffer size for more efficiency, but no guarantee you get the latest chunk
+        # Maybe useful when you are trying to sync 1000's of bakcloged transactions,
+        # then restart with buf_size=1 to clean up the last transaction.
         parsed = ijson.parse(data_stream, multiple_values=True, buf_size=1)
 
         for txn in ijson.common.items(parsed, ''):
@@ -57,13 +59,12 @@ def main(source, dest, slot, auto_slot=False):
             writer.begin()
             for item in change_list:
                 transformed = transformer.transform(item)
-                # TODO: support None
                 if isinstance(transformed, (list, tuple)):
                     for action in transformed:
                         writer.write_json(action)
-                else:
+                elif transformed is not None:
                     writer.write_json(transformed)
-            # record last lsn in lsn_sync_log... TODO: add 0/40?
+            # record last lsn in lsn_sync_log...
             writer.set_end_lsn(slot, end_lsn)
             writer.commit()
     finally:

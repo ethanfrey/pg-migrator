@@ -26,8 +26,6 @@ class JsonWriter(object):
         self._ensure_cursor()
 
     def commit(self):
-        # TOOD: more than one transaction per cursor????
-        # TODO: order of commit, close
         print "Commiting"
         self.conn.commit()
         self.cur.close()
@@ -74,7 +72,6 @@ class JsonWriter(object):
         sql_values = item['columnvalues']
         print self.cur.mogrify(sql, sql_values)
         self.cur.execute(sql, sql_values)
-        # TODO: table -> pk_name, sequence mapper, then update sequence on insert
         self.increment_sequences_for_item(item)
 
     def delete_to_sql(self, item):
@@ -115,8 +112,6 @@ class JsonWriter(object):
         for (schema, _oid1, _oid2, table_name, seq_name, attr_name) in self.cur.fetchall():
             key = "{}.{}".format(schema, table_name)
             self.sequence_map[key].append((attr_name, seq_name))
-        # debug
-        print self.sequence_map
 
     def increment_sequences_for_item(self, item):
         """
@@ -130,9 +125,6 @@ class JsonWriter(object):
             # this may increment too much, but never go down
             update_sql = "select case when nextval(%s) < %s THEN setval(%s, %s) end;"
             sql_vals = (seq, val, seq, val)
-            # this doesn't do extra increments, but may decend...
-            # update_sql = "select setval(%s, %s);"
-            # sql_vals = (seq, val)
             print self.cur.mogrify(update_sql, sql_vals)
             self.cur.execute(update_sql, sql_vals)
 
@@ -156,5 +148,3 @@ class JsonWriter(object):
         start_lsn = '{}/{}'.format(lsn1, lsn2)
         insert_sql = "UPDATE lsn_sync_log SET lsn = %s WHERE slot = %s and lsn < %s;"
         self.cur.execute(insert_sql, (start_lsn, slot, start_lsn))
-
-
