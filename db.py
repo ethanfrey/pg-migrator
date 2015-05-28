@@ -142,9 +142,5 @@ class JsonWriter(object):
             return None
 
     def set_end_lsn(self, slot, end_lsn):
-        # we have to add 0x40 to this to move beyond the "end commit" wal block
-        lsn1, lsn2 = end_lsn.split('/')
-        lsn2 = hex(int(lsn2, 16) + 64).upper()[2:]
-        start_lsn = '{}/{}'.format(lsn1, lsn2)
         insert_sql = "UPDATE lsn_sync_log SET lsn = %s WHERE slot = %s and lsn < %s;"
-        self.cur.execute(insert_sql, (start_lsn, slot, start_lsn))
+        self.cur.execute(insert_sql, (end_lsn, slot, end_lsn))

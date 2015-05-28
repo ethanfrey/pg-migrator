@@ -51,9 +51,8 @@ def main(source, dest, slot, auto_slot=False):
         parsed = ijson.parse(data_stream, multiple_values=True, buf_size=1)
 
         for txn in ijson.common.items(parsed, ''):
-            end_lsn = txn.get('end_lsn')
+            end_lsn = txn.get('nextlsn')
             print "Xid: {}".format(txn.get('xid'))
-            print "Start Lsn: {}".format(txn.get('start_lsn'))
             print "End Lsn: {}".format(end_lsn)
             change_list = txn['change']
             writer.begin()

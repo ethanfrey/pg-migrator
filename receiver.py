@@ -14,7 +14,8 @@ class Receiver(object):
             'include-schemas': True,
             'include-types': False,
             'include-timestamp': False,
-            'include-xids': True
+            'include-xids': True,
+            'include-lsn': True
             }
 
 
@@ -39,7 +40,7 @@ class SubprocessReceiver(Receiver):
 
     def _make_plugin_options(self):
         # TODO: build from self.options
-        return ['-o', 'include-schemas=t', '-o', 'include-types=f', '-o', 'include-timestamp=f']
+        return ['-o', 'include-schemas=t', '-o', 'include-types=f', '-o', 'include-timestamp=f', '-o', 'include-lsn=t']
 
     def create_replication_slot(self):
         cmd = ['pg_recvlogical', '--slot', self.slot, '--plugin', self.plugin, '--create-slot'] + self._make_conn_args()
